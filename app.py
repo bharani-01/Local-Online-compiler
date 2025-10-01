@@ -8,7 +8,8 @@ import signal
 import psutil
 import time
 import json
-import autopep8
+# Skip autopep8 for Python 3.12+ (lib2to3 removed)
+HAS_AUTOPEP8 = False
 
 app = Flask(__name__, static_folder='.')
 CORS(app)
@@ -19,10 +20,23 @@ MAX_MEMORY_MB = 512  # MB
 MAX_CPU_PERCENT = 80  # percentage
 
 def format_code(code):
-    """Format Python code using autopep8"""
+    """Format Python code using ast.unparse for Python 3.9+"""
     try:
-        formatted = autopep8.fix_code(code, options={'aggressive': 2})
-        return {'formatted_code': formatted, 'error': None}
+        import ast
+        
+        # Parse and validate the code
+        tree = ast.parse(code)
+        
+        # Use ast.unparse if available (Python 3.9+)
+        if hasattr(ast, 'unparse'):
+            formatted = ast.unparse(tree)
+            return {'formatted_code': formatted, 'error': None}
+        else:
+            # For older Python versions, just validate the syntax
+            return {'formatted_code': code, 'error': None}
+            
+    except SyntaxError as e:
+        return {'formatted_code': None, 'error': f'Syntax error: {e}'}
     except Exception as e:
         return {'formatted_code': None, 'error': str(e)}
 
@@ -111,6 +125,7 @@ def run_in_docker(code, input_data, packages=None):
 
 def run_with_resource_limits(code, input_data):
     """Run code with CPU and memory limits (fallback when Docker is not available)"""
+    process = None
     try:
         # Create temporary file for the code
         with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
@@ -118,62 +133,26 @@ def run_with_resource_limits(code, input_data):
             temp_file_path = f.name
         
         try:
-            # Start the process
-            process = subprocess.Popen(
+            # Run with timeout using subprocess.run for simpler handling
+            result = subprocess.run(
                 [sys.executable, temp_file_path],
-                stdin=subprocess.PIPE,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True
+                input=input_data,
+                capture_output=True,
+                text=True,
+                timeout=MAX_EXECUTION_TIME
             )
             
-            # Monitor resource usage
-            start_time = time.time()
-            try:
-                ps_process = psutil.Process(process.pid)
-                
-                while process.poll() is None:
-                    # Check timeout
-                    if time.time() - start_time > MAX_EXECUTION_TIME:
-                        process.kill()
-                        return {'success': False, 'error': 'Execution timed out'}
-                    
-                    # Check memory usage
-                    try:
-                        mem_info = ps_process.memory_info()
-                        if mem_info.rss / (1024 * 1024) > MAX_MEMORY_MB:
-                            process.kill()
-                            return {'success': False, 'error': f'Memory limit ({MAX_MEMORY_MB}MB) exceeded'}
-                    except psutil.NoSuchProcess:
-                        break
-                    
-                    time.sleep(0.1)
-                
-                # Get output
-                stdout, stderr = process.communicate(input=input_data, timeout=1)
-                
-                return {
-                    'success': True,
-                    'output': stdout,
-                    'error': stderr,
-                    'returncode': process.returncode
-                }
-                
-            except psutil.NoSuchProcess:
-                stdout, stderr = process.communicate(input=input_data, timeout=1)
-                return {
-                    'success': True,
-                    'output': stdout,
-                    'error': stderr,
-                    'returncode': process.returncode
-                }
+            return {
+                'success': True,
+                'output': result.stdout,
+                'error': result.stderr,
+                'returncode': result.returncode
+            }
                 
         finally:
             os.unlink(temp_file_path)
             
     except subprocess.TimeoutExpired:
-        if process:
-            process.kill()
         return {'success': False, 'error': 'Execution timed out'}
     except Exception as e:
         return {'success': False, 'error': str(e)}

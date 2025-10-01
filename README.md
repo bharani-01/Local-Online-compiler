@@ -124,10 +124,10 @@ Pre-loaded templates for:
 - **Editor Themes**: Choose from Default, Monokai, Dracula, Material, and Eclipse
 
 ### Auto-Formatting
-Server-side endpoint uses autopep8 to:
-- Fix indentation
-- Normalize spacing
-- Apply PEP 8 style guidelines
+Server-side endpoint uses Python's built-in AST module to:
+- Validate syntax
+- Normalize formatting
+- Apply consistent code style
 
 ### Docker Sandboxing
 When enabled:
