@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Python Online Compiler - Client-Side</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/theme/monokai.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/theme/dracula.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/theme/material.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/theme/eclipse.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/python/python.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/pyodide/v0.24.1/full/pyodide.js"></script>
+    <style>
+        .CodeMirror {
+            height: 100%;
+            font-size: 14px;
+            border-radius: 0.375rem;
+        }
+        .dark-mode {
+            background-color: #1a202c;
+            color: #e2e8f0;
+        }
+        .dark-mode .bg-white {
+            background-color: #2d3748 !important;
+        }
+        .dark-mode .text-gray-800 {
+            color: #e2e8f0 !important;
+        }
+        .dark-mode .bg-gray-100 {
+            background-color: #1a202c !important;
+        }
+        .dark-mode .border-gray-300 {
+            border-color: #4a5568 !important;
+        }
+        .dark-mode input, .dark-mode textarea, .dark-mode select {
+            background-color: #2d3748;
+            color: #e2e8f0;
+            border-color: #4a5568;
+        }
+        #plotOutput img {
+            max-width: 100%;
+            height: auto;
+            margin-top: 1rem;
+            border-radius: 0.375rem;
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <div class="container mx-auto px-4 py-6">
+        <!-- Header -->
+        <div class="flex justify-between items-center mb-6">
+            <div>
+                <h1 class="text-3xl font-bold text-gray-800">Python Online Compiler</h1>
+                <p class="text-sm text-gray-600 mt-1">Client-Side Execution with Pyodide (WebAssembly)</p>
+            </div>
+            <div class="flex gap-2">
+                <button id="themeToggle" class="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-800 transition">
+                    🌙 Dark Mode
+                </button>
+                <a href="/" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
+                    Switch to Server-Side
+                </a>
+            </div>
+        </div>
+
+        <!-- Pyodide Status -->
+        <div id="pyodideStatus" class="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 mb-6 rounded">
+            <p class="font-semibold">⏳ Loading Pyodide...</p>
+            <p class="text-sm">Please wait while we initialize the Python runtime in your browser.</p>
+        </div>
+
+        <!-- Main Content -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Left Panel: Editor and Controls -->
+            <div class="lg:col-span-2 space-y-4">
+                <!-- Code Snippets -->
+                <div class="bg-white rounded-lg shadow-md p-4">
+                    <div class="flex justify-between items-center mb-3">
+                        <label class="font-semibold text-gray-700">Code Snippets:</label>
+                        <div class="flex gap-2">
+                            <select id="snippetSelect" class="border border-gray-300 rounded px-3 py-1 text-sm">
+                                <option value="">-- Select a snippet --</option>
+                                <option value="hello_world">Hello World</option>
+                                <option value="input_output">Input/Output</option>
+                                <option value="list_comprehension">List Comprehension</option>
+                                <option value="function">Function Example</option>
+                                <option value="class">Class Example</option>
+                                <option value="matplotlib">Matplotlib Plot</option>
+                                <option value="numpy">NumPy Example</option>
+                            </select>
+                            <button id="loadSnippet" class="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 text-sm">
+                                Load
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Editor Settings -->
+                <div class="bg-white rounded-lg shadow-md p-4">
+                    <div class="flex flex-wrap gap-4 items-center">
+                        <div>
+                            <label class="font-semibold text-gray-700 mr-2">Editor Theme:</label>
+                            <select id="editorTheme" class="border border-gray-300 rounded px-3 py-1">
+                                <option value="default">Default</option>
+                                <option value="monokai">Monokai</option>
+                                <option value="dracula">Dracula</option>
+                                <option value="material">Material</option>
+                                <option value="eclipse">Eclipse</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Code Editor -->
+                <div class="bg-white rounded-lg shadow-md p-4">
+                    <label class="block font-semibold text-gray-700 mb-2">Python Code:</label>
+                    <div class="border border-gray-300 rounded-lg overflow-hidden" style="height: 400px;">
+                        <textarea id="codeEditor">print("Hello, World!")</textarea>
+                    </div>
+                </div>
+
+                <!-- Input Area -->
+                <div class="bg-white rounded-lg shadow-md p-4">
+                    <label class="block font-semibold text-gray-700 mb-2">Input (stdin):</label>
+                    <textarea id="inputArea" 
+                              class="w-full border border-gray-300 rounded-lg p-3 font-mono text-sm"
+                              rows="4"
+                              placeholder="Enter input here (optional)..."></textarea>
+                </div>
+
+                <!-- Package Installation -->
+                <div class="bg-white rounded-lg shadow-md p-4">
+                    <label class="block font-semibold text-gray-700 mb-2">Install Packages via micropip:</label>
+                    <div class="flex gap-2">
+                        <input type="text" 
+                               id="packageName" 
+                               class="flex-1 border border-gray-300 rounded-lg p-3 text-sm"
+                               placeholder="e.g., matplotlib, numpy, pandas">
+                        <button id="installPackage" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition">
+                            📦 Install
+                        </button>
+                    </div>
+                    <p class="text-xs text-gray-500 mt-2">Popular packages: matplotlib, numpy, pandas, scipy, scikit-learn</p>
+                    <div id="installedPackages" class="mt-2 text-sm text-gray-600"></div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="flex gap-3">
+                    <button id="runBtn" class="flex-1 bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition" disabled>
+                        ▶ Run Code
+                    </button>
+                    <button id="clearBtn" class="bg-gray-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-gray-700 transition">
+                        🗑 Clear
+                    </button>
+                </div>
+            </div>
+
+            <!-- Right Panel: Output -->
+            <div class="lg:col-span-1">
+                <div class="bg-white rounded-lg shadow-md p-4 sticky top-6">
+                    <h2 class="text-xl font-semibold text-gray-800 mb-3">Output:</h2>
+                    <div id="output" 
+                         class="bg-gray-900 text-green-400 p-4 rounded-lg font-mono text-sm whitespace-pre-wrap min-h-[300px] max-h-[500px] overflow-auto">
+                        <span class="text-gray-500">Output will appear here...</span>
+                    </div>
+                    <div id="status" class="mt-3 text-sm"></div>
+                    
+                    <!-- Plot Output -->
+                    <div id="plotOutput" class="mt-4"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="mt-8 text-center text-gray-600 text-sm">
+            <p>Client-Side Python Compiler powered by Pyodide (CPython in WebAssembly)</p>
+            <p class="mt-1">Features: Instant execution, matplotlib support, micropip package installation</p>
+        </div>
+    </div>
+
+    <script>
+        let pyodide = null;
+        let inputQueue = [];
+        const installedPackages = new Set();
+
+        // Code snippets
+        const snippets = {
+            hello_world: 'print("Hello, World!")',
+            input_output: 'name = input("Enter your name: ")\nprint(f"Hello, {name}!")',
+            list_comprehension: '# Create a list of squares\nsquares = [x**2 for x in range(10)]\nprint(squares)',
+            function: 'def greet(name):\n    """Greet someone by name"""\n    return f"Hello, {name}!"\n\n# Call the function\nprint(greet("World"))',
+            class: 'class Person:\n    def __init__(self, name, age):\n        self.name = name\n        self.age = age\n    \n    def introduce(self):\n        return f"Hi, I\'m {self.name} and I\'m {self.age} years old"\n\n# Create instance\nperson = Person("Alice", 30)\nprint(person.introduce())',
+            matplotlib: `import matplotlib.pyplot as plt
+import io
+import base64
+
+# Create a simple plot
+x = [1, 2, 3, 4, 5]
+y = [1, 4, 9, 16, 25]
+
+plt.figure(figsize=(8, 6))
+plt.plot(x, y, marker='o')
+plt.xlabel('X axis')
+plt.ylabel('Y axis')
+plt.title('Simple Plot')
+plt.grid(True)
+
+# Save to base64
+buf = io.BytesIO()
+plt.savefig(buf, format='png')
+buf.seek(0)
+import base64
+img_str = base64.b64encode(buf.read()).decode()
+print(f"IMAGE:{img_str}")
+plt.close()`,
+            numpy: `import numpy as np
+
+# Create arrays
+arr1 = np.array([1, 2, 3, 4, 5])
+arr2 = np.array([6, 7, 8, 9, 10])
+
+print("Array 1:", arr1)
+print("Array 2:", arr2)
+print("Sum:", arr1 + arr2)
+print("Mean:", np.mean(arr1))
+print("Standard deviation:", np.std(arr1))`
+        };
+
+        // Initialize CodeMirror
+        const editor = CodeMirror.fromTextArea(document.getElementById('codeEditor'), {
+            mode: 'python',
+            theme: 'default',
+            lineNumbers: true,
+            indentUnit: 4,
+            indentWithTabs: false,
+            lineWrapping: true
+        });
+
+        // Load saved settings
+        const savedCode = localStorage.getItem('pyodideCode');
+        const savedInput = localStorage.getItem('pyodideInput');
+        const savedTheme = localStorage.getItem('editorTheme') || 'default';
+        const savedDarkMode = localStorage.getItem('darkMode') === 'true';
+        
+        if (savedCode) editor.setValue(savedCode);
+        if (savedInput) document.getElementById('inputArea').value = savedInput;
+        editor.setOption('theme', savedTheme);
+        document.getElementById('editorTheme').value = savedTheme;
+
+        // Apply dark mode if saved
+        if (savedDarkMode) {
+            document.body.classList.add('dark-mode');
+            document.getElementById('themeToggle').textContent = '☀️ Light Mode';
+        }
+
+        // Save code and input on change
+        editor.on('change', () => {
+            localStorage.setItem('pyodideCode', editor.getValue());
+        });
+        document.getElementById('inputArea').addEventListener('input', (e) => {
+            localStorage.setItem('pyodideInput', e.target.value);
+        });
+
+        // Theme toggle
+        document.getElementById('themeToggle').addEventListener('click', () => {
+            document.body.classList.toggle('dark-mode');
+            const isDark = document.body.classList.contains('dark-mode');
+            document.getElementById('themeToggle').textContent = isDark ? '☀️ Light Mode' : '🌙 Dark Mode';
+            localStorage.setItem('darkMode', isDark);
+        });
+
+        // Editor theme change
+        document.getElementById('editorTheme').addEventListener('change', (e) => {
+            editor.setOption('theme', e.target.value);
+            localStorage.setItem('editorTheme', e.target.value);
+        });
+
+        // Load snippet
+        document.getElementById('loadSnippet').addEventListener('click', () => {
+            const snippetKey = document.getElementById('snippetSelect').value;
+            if (snippetKey && snippets[snippetKey]) {
+                editor.setValue(snippets[snippetKey]);
+            } else {
+                alert('Please select a snippet');
+            }
+        });
+
+        // Initialize Pyodide
+        async function initPyodide() {
+            const statusDiv = document.getElementById('pyodideStatus');
+            const runBtn = document.getElementById('runBtn');
+            
+            try {
+                statusDiv.innerHTML = '<p class="font-semibold">⏳ Loading Pyodide...</p><p class="text-sm">This may take a few seconds...</p>';
+                
+                pyodide = await loadPyodide({
+                    indexURL: "https://cdn.jsdelivr.net/pyodide/v0.24.1/full/"
+                });
+                
+                // Setup stdin for input handling
+                pyodide.setStdin({
+                    stdin: () => {
+                        if (inputQueue.length === 0) {
+                            const userInput = prompt("Input required:");
+                            return userInput !== null ? userInput : "";
+                        }
+                        return inputQueue.shift();
+                    }
+                });
+                
+                statusDiv.innerHTML = '<p class="font-semibold text-green-600">✓ Pyodide ready!</p><p class="text-sm">You can now run Python code in your browser.</p>';
+                statusDiv.classList.remove('bg-yellow-100', 'border-yellow-500', 'text-yellow-700');
+                statusDiv.classList.add('bg-green-100', 'border-green-500', 'text-green-700');
+                
+                runBtn.disabled = false;
+                
+            } catch (error) {
+                statusDiv.innerHTML = `<p class="font-semibold text-red-600">✗ Failed to load Pyodide</p><p class="text-sm">${error.message}</p>`;
+                statusDiv.classList.remove('bg-yellow-100', 'border-yellow-500', 'text-yellow-700');
+                statusDiv.classList.add('bg-red-100', 'border-red-500', 'text-red-700');
+            }
+        }
+
+        // Install package
+        document.getElementById('installPackage').addEventListener('click', async () => {
+            if (!pyodide) {
+                alert('Pyodide is not ready yet. Please wait.');
+                return;
+            }
+            
+            const packageName = document.getElementById('packageName').value.trim();
+            if (!packageName) {
+                alert('Please enter a package name');
+                return;
+            }
+            
+            const statusDiv = document.getElementById('status');
+            const installBtn = document.getElementById('installPackage');
+            
+            statusDiv.innerHTML = `<span class="text-blue-600">⏳ Installing ${packageName}...</span>`;
+            installBtn.disabled = true;
+            
+            try {
+                await pyodide.loadPackage("micropip");
+                const micropip = pyodide.pyimport("micropip");
+                await micropip.install(packageName);
+                
+                installedPackages.add(packageName);
+                updateInstalledPackages();
+                
+                statusDiv.innerHTML = `<span class="text-green-600">✓ ${packageName} installed successfully!</span>`;
+                document.getElementById('packageName').value = '';
+                
+                setTimeout(() => statusDiv.innerHTML = '', 3000);
+            } catch (error) {
+                statusDiv.innerHTML = `<span class="text-red-600">✗ Failed to install ${packageName}: ${error.message}</span>`;
+            } finally {
+                installBtn.disabled = false;
+            }
+        });
+
+        // Update installed packages display
+        function updateInstalledPackages() {
+            const div = document.getElementById('installedPackages');
+            if (installedPackages.size > 0) {
+                div.innerHTML = '<strong>Installed:</strong> ' + Array.from(installedPackages).join(', ');
+            }
+        }
+
+        // Run code
+        document.getElementById('runBtn').addEventListener('click', async () => {
+            if (!pyodide) {
+                alert('Pyodide is not ready yet. Please wait.');
+                return;
+            }
+            
+            const code = editor.getValue();
+            const input = document.getElementById('inputArea').value;
+            const outputDiv = document.getElementById('output');
+            const plotDiv = document.getElementById('plotOutput');
+            const statusDiv = document.getElementById('status');
+            const runBtn = document.getElementById('runBtn');
+            
+            // Prepare input queue
+            inputQueue = input.split('\n').filter(line => line.trim() !== '');
+            
+            outputDiv.innerHTML = '<span class="text-yellow-400">⏳ Running...</span>';
+            plotDiv.innerHTML = '';
+            statusDiv.innerHTML = '<span class="text-blue-600">⏳ Executing code...</span>';
+            runBtn.disabled = true;
+            runBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            
+            const startTime = Date.now();
+            let capturedOutput = '';
+            
+            try {
+                // Redirect stdout
+                pyodide.runPython(`
+import sys
+import io
+sys.stdout = io.StringIO()
+sys.stderr = io.StringIO()
+                `);
+                
+                // Run the code
+                await pyodide.runPythonAsync(code);
+                
+                // Get output
+                const stdout = pyodide.runPython('sys.stdout.getvalue()');
+                const stderr = pyodide.runPython('sys.stderr.getvalue()');
+                
+                capturedOutput = stdout;
+                
+                // Check for image output
+                if (stdout.includes('IMAGE:')) {
+                    const lines = stdout.split('\n');
+                    const imageLine = lines.find(line => line.startsWith('IMAGE:'));
+                    if (imageLine) {
+                        const base64Data = imageLine.replace('IMAGE:', '');
+                        plotDiv.innerHTML = `<img src="data:image/png;base64,${base64Data}" alt="Plot">`;
+                        capturedOutput = lines.filter(line => !line.startsWith('IMAGE:')).join('\n');
+                    }
+                }
+                
+                const executionTime = ((Date.now() - startTime) / 1000).toFixed(2);
+                
+                let output = capturedOutput || '<span class="text-gray-500">No output</span>';
+                if (stderr) {
+                    output += '\n<span class="text-red-400">' + stderr + '</span>';
+                }
+                
+                outputDiv.innerHTML = output;
+                statusDiv.innerHTML = `<span class="text-green-600">✓ Executed successfully in ${executionTime}s</span>`;
+                
+            } catch (error) {
+                const executionTime = ((Date.now() - startTime) / 1000).toFixed(2);
+                outputDiv.innerHTML = `<span class="text-red-400">${error.message}</span>`;
+                statusDiv.innerHTML = `<span class="text-red-600">✗ Execution failed after ${executionTime}s</span>`;
+            } finally {
+                runBtn.disabled = false;
+                runBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            }
+        });
+
+        // Clear
+        document.getElementById('clearBtn').addEventListener('click', () => {
+            if (confirm('Clear code and output?')) {
+                editor.setValue('');
+                document.getElementById('inputArea').value = '';
+                document.getElementById('output').innerHTML = '<span class="text-gray-500">Output will appear here...</span>';
+                document.getElementById('status').innerHTML = '';
+                document.getElementById('plotOutput').innerHTML = '';
+                document.getElementById('packageName').value = '';
+                localStorage.removeItem('pyodideCode');
+                localStorage.removeItem('pyodideInput');
+            }
+        });
+
+        // Initialize on page load
+        initPyodide();
+    </script>
+</body>
+</html>

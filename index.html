@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Python Online Compiler - Server-Side</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/theme/monokai.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/theme/dracula.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/theme/material.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/theme/eclipse.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/python/python.min.js"></script>
+    <style>
+        .CodeMirror {
+            height: 100%;
+            font-size: 14px;
+            border-radius: 0.375rem;
+        }
+        .dark-mode {
+            background-color: #1a202c;
+            color: #e2e8f0;
+        }
+        .dark-mode .bg-white {
+            background-color: #2d3748 !important;
+        }
+        .dark-mode .text-gray-800 {
+            color: #e2e8f0 !important;
+        }
+        .dark-mode .bg-gray-100 {
+            background-color: #1a202c !important;
+        }
+        .dark-mode .border-gray-300 {
+            border-color: #4a5568 !important;
+        }
+        .dark-mode input, .dark-mode textarea, .dark-mode select {
+            background-color: #2d3748;
+            color: #e2e8f0;
+            border-color: #4a5568;
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <div class="container mx-auto px-4 py-6">
+        <!-- Header -->
+        <div class="flex justify-between items-center mb-6">
+            <div>
+                <h1 class="text-3xl font-bold text-gray-800">Python Online Compiler</h1>
+                <p class="text-sm text-gray-600 mt-1">Server-Side Execution with Enhanced Features</p>
+            </div>
+            <div class="flex gap-2">
+                <button id="themeToggle" class="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-800 transition">
+                    🌙 Dark Mode
+                </button>
+                <a href="/test.html" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
+                    Switch to Client-Side
+                </a>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Left Panel: Editor and Controls -->
+            <div class="lg:col-span-2 space-y-4">
+                <!-- Code Snippets -->
+                <div class="bg-white rounded-lg shadow-md p-4">
+                    <div class="flex justify-between items-center mb-3">
+                        <label class="font-semibold text-gray-700">Code Snippets:</label>
+                        <div class="flex gap-2">
+                            <select id="snippetSelect" class="border border-gray-300 rounded px-3 py-1 text-sm">
+                                <option value="">-- Select a snippet --</option>
+                            </select>
+                            <button id="loadSnippet" class="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 text-sm">
+                                Load
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Editor Settings -->
+                <div class="bg-white rounded-lg shadow-md p-4">
+                    <div class="flex flex-wrap gap-4 items-center">
+                        <div>
+                            <label class="font-semibold text-gray-700 mr-2">Editor Theme:</label>
+                            <select id="editorTheme" class="border border-gray-300 rounded px-3 py-1">
+                                <option value="default">Default</option>
+                                <option value="monokai">Monokai</option>
+                                <option value="dracula">Dracula</option>
+                                <option value="material">Material</option>
+                                <option value="eclipse">Eclipse</option>
+                            </select>
+                        </div>
+                        <button id="formatCode" class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition">
+                            ✨ Format Code
+                        </button>
+                        <div class="flex items-center">
+                            <input type="checkbox" id="useDocker" class="mr-2">
+                            <label for="useDocker" class="text-sm text-gray-700">Use Docker Sandbox</label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Code Editor -->
+                <div class="bg-white rounded-lg shadow-md p-4">
+                    <label class="block font-semibold text-gray-700 mb-2">Python Code:</label>
+                    <div class="border border-gray-300 rounded-lg overflow-hidden" style="height: 400px;">
+                        <textarea id="codeEditor">print("Hello, World!")</textarea>
+                    </div>
+                </div>
+
+                <!-- Input Area -->
+                <div class="bg-white rounded-lg shadow-md p-4">
+                    <label class="block font-semibold text-gray-700 mb-2">Input (stdin):</label>
+                    <textarea id="inputArea" 
+                              class="w-full border border-gray-300 rounded-lg p-3 font-mono text-sm"
+                              rows="4"
+                              placeholder="Enter input here (optional)..."></textarea>
+                </div>
+
+                <!-- Package Installation -->
+                <div class="bg-white rounded-lg shadow-md p-4">
+                    <label class="block font-semibold text-gray-700 mb-2">Install Packages (experimental):</label>
+                    <input type="text" 
+                           id="packagesInput" 
+                           class="w-full border border-gray-300 rounded-lg p-3 text-sm"
+                           placeholder="e.g., numpy, pandas (comma-separated)">
+                    <p class="text-xs text-gray-500 mt-1">⚠️ Package installation is experimental and may take time</p>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="flex gap-3">
+                    <button id="runBtn" class="flex-1 bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition">
+                        ▶ Run Code
+                    </button>
+                    <button id="clearBtn" class="bg-gray-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-gray-700 transition">
+                        🗑 Clear
+                    </button>
+                </div>
+            </div>
+
+            <!-- Right Panel: Output -->
+            <div class="lg:col-span-1">
+                <div class="bg-white rounded-lg shadow-md p-4 sticky top-6">
+                    <h2 class="text-xl font-semibold text-gray-800 mb-3">Output:</h2>
+                    <div id="output" 
+                         class="bg-gray-900 text-green-400 p-4 rounded-lg font-mono text-sm whitespace-pre-wrap min-h-[500px] max-h-[700px] overflow-auto">
+                        <span class="text-gray-500">Output will appear here...</span>
+                    </div>
+                    <div id="status" class="mt-3 text-sm"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="mt-8 text-center text-gray-600 text-sm">
+            <p>Server-Side Python Compiler with Docker Sandboxing, Resource Limits & Code Formatting</p>
+            <p class="mt-1">Features: CPU/Memory monitoring, Package installation, Theme switching, Code snippets</p>
+        </div>
+    </div>
+
+    <script>
+        // Initialize CodeMirror
+        const editor = CodeMirror.fromTextArea(document.getElementById('codeEditor'), {
+            mode: 'python',
+            theme: 'default',
+            lineNumbers: true,
+            indentUnit: 4,
+            indentWithTabs: false,
+            lineWrapping: true
+        });
+
+        // Load saved code and input from localStorage
+        const savedCode = localStorage.getItem('pythonCode');
+        const savedInput = localStorage.getItem('pythonInput');
+        const savedTheme = localStorage.getItem('editorTheme') || 'default';
+        const savedDarkMode = localStorage.getItem('darkMode') === 'true';
+        
+        if (savedCode) editor.setValue(savedCode);
+        if (savedInput) document.getElementById('inputArea').value = savedInput;
+        editor.setOption('theme', savedTheme);
+        document.getElementById('editorTheme').value = savedTheme;
+
+        // Apply dark mode if saved
+        if (savedDarkMode) {
+            document.body.classList.add('dark-mode');
+            document.getElementById('themeToggle').textContent = '☀️ Light Mode';
+        }
+
+        // Save code and input on change
+        editor.on('change', () => {
+            localStorage.setItem('pythonCode', editor.getValue());
+        });
+        document.getElementById('inputArea').addEventListener('input', (e) => {
+            localStorage.setItem('pythonInput', e.target.value);
+        });
+
+        // Theme toggle
+        document.getElementById('themeToggle').addEventListener('click', () => {
+            document.body.classList.toggle('dark-mode');
+            const isDark = document.body.classList.contains('dark-mode');
+            document.getElementById('themeToggle').textContent = isDark ? '☀️ Light Mode' : '🌙 Dark Mode';
+            localStorage.setItem('darkMode', isDark);
+        });
+
+        // Editor theme change
+        document.getElementById('editorTheme').addEventListener('change', (e) => {
+            editor.setOption('theme', e.target.value);
+            localStorage.setItem('editorTheme', e.target.value);
+        });
+
+        // Load code snippets
+        async function loadSnippets() {
+            try {
+                const response = await fetch('/snippets');
+                const snippets = await response.json();
+                const select = document.getElementById('snippetSelect');
+                
+                for (const [key, snippet] of Object.entries(snippets)) {
+                    const option = document.createElement('option');
+                    option.value = key;
+                    option.textContent = snippet.name;
+                    select.appendChild(option);
+                }
+            } catch (error) {
+                console.error('Failed to load snippets:', error);
+            }
+        }
+
+        // Load snippet
+        document.getElementById('loadSnippet').addEventListener('click', async () => {
+            const select = document.getElementById('snippetSelect');
+            const snippetKey = select.value;
+            
+            if (!snippetKey) {
+                alert('Please select a snippet');
+                return;
+            }
+
+            try {
+                const response = await fetch('/snippets');
+                const snippets = await response.json();
+                editor.setValue(snippets[snippetKey].code);
+            } catch (error) {
+                alert('Failed to load snippet: ' + error.message);
+            }
+        });
+
+        // Format code
+        document.getElementById('formatCode').addEventListener('click', async () => {
+            const code = editor.getValue();
+            const statusDiv = document.getElementById('status');
+            
+            statusDiv.innerHTML = '<span class="text-blue-600">⏳ Formatting code...</span>';
+            
+            try {
+                const response = await fetch('/format', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ code })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    editor.setValue(data.formatted_code);
+                    statusDiv.innerHTML = '<span class="text-green-600">✓ Code formatted successfully!</span>';
+                    setTimeout(() => statusDiv.innerHTML = '', 3000);
+                } else {
+                    statusDiv.innerHTML = `<span class="text-red-600">✗ Format error: ${data.error}</span>`;
+                }
+            } catch (error) {
+                statusDiv.innerHTML = `<span class="text-red-600">✗ Format error: ${error.message}</span>`;
+            }
+        });
+
+        // Run code
+        document.getElementById('runBtn').addEventListener('click', async () => {
+            const code = editor.getValue();
+            const input = document.getElementById('inputArea').value;
+            const useDocker = document.getElementById('useDocker').checked;
+            const packagesInput = document.getElementById('packagesInput').value.trim();
+            const packages = packagesInput ? packagesInput.split(',').map(p => p.trim()) : [];
+            
+            const outputDiv = document.getElementById('output');
+            const statusDiv = document.getElementById('status');
+            const runBtn = document.getElementById('runBtn');
+            
+            outputDiv.innerHTML = '<span class="text-yellow-400">⏳ Running...</span>';
+            statusDiv.innerHTML = '<span class="text-blue-600">⏳ Executing code...</span>';
+            runBtn.disabled = true;
+            runBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            
+            const startTime = Date.now();
+            
+            try {
+                const response = await fetch('/run', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ 
+                        code, 
+                        input, 
+                        use_docker: useDocker,
+                        packages 
+                    })
+                });
+                
+                const data = await response.json();
+                const executionTime = ((Date.now() - startTime) / 1000).toFixed(2);
+                
+                if (response.ok) {
+                    let output = '';
+                    if (data.output) {
+                        output += data.output;
+                    }
+                    if (data.error) {
+                        output += '\n<span class="text-red-400">' + data.error + '</span>';
+                    }
+                    outputDiv.innerHTML = output || '<span class="text-gray-500">No output</span>';
+                    statusDiv.innerHTML = `<span class="text-green-600">✓ Executed successfully in ${executionTime}s</span>`;
+                } else {
+                    outputDiv.innerHTML = `<span class="text-red-400">Error: ${data.error}</span>`;
+                    statusDiv.innerHTML = `<span class="text-red-600">✗ Execution failed after ${executionTime}s</span>`;
+                }
+            } catch (error) {
+                outputDiv.innerHTML = `<span class="text-red-400">Error: ${error.message}</span>`;
+                statusDiv.innerHTML = '<span class="text-red-600">✗ Request failed</span>';
+            } finally {
+                runBtn.disabled = false;
+                runBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            }
+        });
+
+        // Clear
+        document.getElementById('clearBtn').addEventListener('click', () => {
+            if (confirm('Clear code and output?')) {
+                editor.setValue('');
+                document.getElementById('inputArea').value = '';
+                document.getElementById('output').innerHTML = '<span class="text-gray-500">Output will appear here...</span>';
+                document.getElementById('status').innerHTML = '';
+                document.getElementById('packagesInput').value = '';
+                localStorage.removeItem('pythonCode');
+                localStorage.removeItem('pythonInput');
+            }
+        });
+
+        // Load snippets on page load
+        loadSnippets();
+    </script>
+</body>
+</html>
